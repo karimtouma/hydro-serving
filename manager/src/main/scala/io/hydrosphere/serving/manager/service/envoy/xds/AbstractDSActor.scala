@@ -6,18 +6,11 @@ import akka.actor.{Actor, ActorLogging}
 import com.trueaccord.scalapb.{GeneratedMessage, Message}
 import envoy.api.v2._
 import io.grpc.stub.StreamObserver
+import io.hydrosphere.serving.manager.service.envoy.xds.dto.{SubscribeMsg, UnsubscribeMsg}
 
 import scala.collection.mutable
 import scala.util.{Failure, Try}
 
-case class SubscribeMsg(
-  discoveryRequest: DiscoveryRequest,
-  responseObserver: StreamObserver[DiscoveryResponse]
-)
-
-case class UnsubscribeMsg(
-  responseObserver: StreamObserver[DiscoveryResponse]
-)
 
 abstract class AbstractDSActor[A <: GeneratedMessage with Message[A]](val typeUrl: String) extends Actor with ActorLogging {
 
@@ -28,6 +21,37 @@ abstract class AbstractDSActor[A <: GeneratedMessage with Message[A]](val typeUr
 
   private val version = new AtomicLong(System.currentTimeMillis())
   private val sentRequest = new AtomicLong(1)
+
+  override def receive: Receive = {
+    case subscribe: SubscribeMsg =>
+      observerNode.put(subscribe.responseObserver, subscribe.discoveryRequest.node.getOrElse(Node.defaultInstance))
+
+      val needUpdateResource = observerResources.get(subscribe.responseObserver) match {
+        case Some(x) =>
+          x != subscribe.discoveryRequest.resourceNames.toSet
+        case None =>
+          true
+      }
+      if (needUpdateResource) {
+        observerResources.put(subscribe.responseObserver, subscribe.discoveryRequest.resourceNames.toSet)
+      }
+      val differentVersion = {
+        !subscribe.discoveryRequest.versionInfo.contains(version.toString)
+      }
+
+      if (differentVersion || needUpdateResource) {
+        sendToObserver(subscribe.responseObserver)
+      }
+
+    case unsubcribe: UnsubscribeMsg =>
+      observerNode.remove(unsubcribe.responseObserver)
+      observerResources.remove(unsubcribe.responseObserver)
+
+    case x =>
+      if (receiveStoreChangeEvents(x)) {
+        increaseVersion()
+      }
+  }
 
   protected def send(discoveryResponse: DiscoveryResponse, stream: StreamObserver[DiscoveryResponse]): Unit = {
     val t = Try({
@@ -62,37 +86,6 @@ abstract class AbstractDSActor[A <: GeneratedMessage with Message[A]](val typeUr
   private def increaseVersion() = {
     version.incrementAndGet()
     observerNode.keys.foreach(o => sendToObserver(o))
-  }
-
-  override def receive: Receive = {
-    case subscribe: SubscribeMsg =>
-      observerNode.put(subscribe.responseObserver, subscribe.discoveryRequest.node.getOrElse(Node.defaultInstance))
-
-      val needUpdateResource = observerResources.get(subscribe.responseObserver) match {
-        case Some(x) =>
-          x != subscribe.discoveryRequest.resourceNames.toSet
-        case None =>
-          true
-      }
-      if (needUpdateResource) {
-        observerResources.put(subscribe.responseObserver, subscribe.discoveryRequest.resourceNames.toSet)
-      }
-      val differentVersion = {
-        !subscribe.discoveryRequest.versionInfo.contains(version.toString)
-      }
-
-      if (differentVersion || needUpdateResource) {
-        sendToObserver(subscribe.responseObserver)
-      }
-
-    case unsubcribe: UnsubscribeMsg =>
-      observerNode.remove(unsubcribe.responseObserver)
-      observerResources.remove(unsubcribe.responseObserver)
-
-    case x =>
-      if (receiveStoreChangeEvents(x)) {
-        increaseVersion()
-      }
   }
 
   protected def receiveStoreChangeEvents(mes: Any): Boolean = false

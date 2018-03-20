@@ -3,30 +3,11 @@ package io.hydrosphere.serving.manager.service.envoy.xds
 import envoy.api.v2.SocketAddress.PortSpecifier
 import envoy.api.v2._
 import io.grpc.stub.StreamObserver
+import io.hydrosphere.serving.manager.service.envoy.xds.dto._
 
 import scala.collection.mutable
 
-case class ClusterEndpoint(
-  host: String,
-  port: Int
-)
 
-case class ClusterInfo(
-  name: String,
-  endpoints: Set[ClusterEndpoint]
-)
-
-case class RenewEndpoints(
-  clusters: Seq[ClusterInfo]
-)
-
-case class AddEndpoints(
-  clusters: Seq[ClusterInfo]
-)
-
-case class RemoveEndpoints(
-  names: Set[String]
-)
 
 class EndpointDSActor(
   val specialCluster: Boolean = false,

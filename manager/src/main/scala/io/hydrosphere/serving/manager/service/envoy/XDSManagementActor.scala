@@ -4,6 +4,7 @@ import akka.actor.{Actor, ActorLogging, ActorRef}
 import io.hydrosphere.serving.manager.service._
 import io.hydrosphere.serving.manager.service.clouddriver.{CloudDriverService, CloudService}
 import io.hydrosphere.serving.manager.service.envoy.xds._
+import io.hydrosphere.serving.manager.service.envoy.xds.dto._
 
 import scala.concurrent.{Await, ExecutionContext}
 import scala.concurrent.duration._

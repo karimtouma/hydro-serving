@@ -1,21 +1,49 @@
-package io.hydrosphere.serving.manager.service.envoy.xds
+package io.hydrosphere.serving.manager.service.envoy.xds.v2.impl
 
+import com.google.protobuf.any
 import envoy.api.v2.RouteAction.ClusterSpecifier
 import envoy.api.v2._
-import io.grpc.stub.StreamObserver
 import io.hydrosphere.serving.manager.model.Application
 import io.hydrosphere.serving.manager.service.clouddriver.CloudDriverService
-import io.hydrosphere.serving.manager.service.envoy.xds.dto.{ApplicationChanged, ApplicationRemoved, SyncApplications}
+import io.hydrosphere.serving.manager.service.envoy.xds.dto._
+import io.hydrosphere.serving.manager.service.envoy.xds.v2.{StateActor, XdsEventBus}
 
 import scala.collection.mutable
 
+class RouteDSActor(implicit requestBus:XdsEventBus[UpdateRequest, String], responseBus:XdsEventBus[UpdateResponse, SubscriptionAddress])
+  extends StateActor[mutable.Map[Long, Seq[VirtualHost]]](typeUrl = "type.googleapis.com/envoy.api.v2.RouteConfiguration"){
 
-
-class RouteDSActor extends AbstractDSActor[RouteConfiguration](typeUrl = "type.googleapis.com/envoy.api.v2.RouteConfiguration") {
-
-  private val applications = mutable.Map[Long, Seq[VirtualHost]]()
+  override def initialState(): mutable.Map[Long, Seq[VirtualHost]] = mutable.Map[Long, Seq[VirtualHost]]()
 
   private val kafkaGatewayHost=createGatewayHost(CloudDriverService.GATEWAY_KAFKA_NAME)
+
+  override def resources(state: mutable.Map[Long, Seq[VirtualHost]]): Seq[any.Any] = {
+    //val clusterName = getObserverNode(responseObserver).fold("manager_xds_cluster")(_.id)
+
+//    val defaultRoute = clusterName match {
+//      case CloudDriverService.MANAGER_NAME =>
+//        defaultManagerVirtualHost()
+//      case _ =>
+//        defaultVirtualHost(clusterName)
+//    }
+//
+//    Seq(createRoute(ROUTE_CONFIG_NAME, defaultRoute)).map(any.Any.pack(_))
+    Seq()
+  }
+
+  override def receiveStoreChangeEvents(mes: Any): Boolean =
+    mes match {
+      case a: SyncApplications =>
+        renewApplications(a.applications)
+        true
+      case a: ApplicationChanged =>
+        addOrUpdateApplication(a.application)
+        true
+      case a: ApplicationRemoved =>
+        removeApplications(Set(a.application.id))
+          .contains(true)
+      case _ => false
+    }
 
   private def createRoutes(application: Application): Seq[VirtualHost] =
     application.executionGraph.stages.zipWithIndex.map { case (appStage, i) =>
@@ -46,36 +74,24 @@ class RouteDSActor extends AbstractDSActor[RouteConfiguration](typeUrl = "type.g
     )
 
   private def addOrUpdateApplication(application: Application): Unit =
-    applications.put(application.id, createRoutes(application))
+    state.put(application.id, createRoutes(application))
 
 
   private def removeApplications(ids: Set[Long]): Set[Boolean] =
-    ids.map(id => applications.remove(id).nonEmpty)
+    ids.map(id => state.remove(id).nonEmpty)
 
 
   private def renewApplications(apps: Seq[Application]): Unit = {
-    applications.clear()
+    state.clear()
     apps.foreach(addOrUpdateApplication)
   }
 
-  override def receiveStoreChangeEvents(mes: Any): Boolean =
-    mes match {
-      case a: SyncApplications =>
-        renewApplications(a.applications)
-        true
-      case a: ApplicationChanged =>
-        addOrUpdateApplication(a.application)
-        true
-      case a: ApplicationRemoved =>
-        removeApplications(Set(a.application.id))
-          .contains(true)
-      case _ => false
-    }
+
 
   private def createRoute(name: String, defaultRoute: VirtualHost): RouteConfiguration =
     RouteConfiguration(
       name = name,
-      virtualHosts = applications.values.flatten.toSeq :+ defaultRoute :+ kafkaGatewayHost
+      virtualHosts = state.values.flatten.toSeq :+ defaultRoute :+ kafkaGatewayHost
     )
 
   private def createGatewayHost(name: String): VirtualHost =
@@ -134,16 +150,4 @@ class RouteDSActor extends AbstractDSActor[RouteConfiguration](typeUrl = "type.g
       )
     )
 
-  override protected def formResources(responseObserver: StreamObserver[DiscoveryResponse]): Seq[RouteConfiguration] = {
-    val clusterName = getObserverNode(responseObserver).fold("manager_xds_cluster")(_.id)
-
-    val defaultRoute = clusterName match {
-      case CloudDriverService.MANAGER_NAME =>
-        defaultManagerVirtualHost()
-      case _ =>
-        defaultVirtualHost(clusterName)
-    }
-
-    Seq(createRoute(ROUTE_CONFIG_NAME, defaultRoute))
-  }
 }

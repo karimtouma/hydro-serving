@@ -7,6 +7,7 @@ import io.hydrosphere.serving.manager.ManagerConfiguration
 import io.hydrosphere.serving.manager.service._
 import io.hydrosphere.serving.manager.service.clouddriver.CloudDriverService
 import io.hydrosphere.serving.manager.service.envoy.xds._
+import io.hydrosphere.serving.manager.service.envoy.xds.dto.{SubscribeMsg, UnsubscribeMsg}
 import org.apache.logging.log4j.scala.Logging
 
 import scala.concurrent.ExecutionContext

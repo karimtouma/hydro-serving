@@ -7,7 +7,7 @@ import envoy.api.v2.filter.network.HttpConnectionManager.Tracing.OperationName
 import io.grpc.stub.StreamObserver
 
 
-class ListenerDSActor extends AbstractDSActor[Listener](typeUrl = "type.googleapis.com/envoy.api.v2.Listener") {
+class ListenerDSA2ctor extends AbstractDSActor[Listener](typeUrl = "type.googleapis.com/envoy.api.v2.Listener") {
 
   private val listeners =
     Seq(createListener(8080, OperationName.INGRESS), createListener(8081, OperationName.EGRESS))

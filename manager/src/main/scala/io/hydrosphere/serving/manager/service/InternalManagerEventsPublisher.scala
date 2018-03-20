@@ -3,16 +3,7 @@ package io.hydrosphere.serving.manager.service
 import akka.actor.ActorSystem
 import io.hydrosphere.serving.manager.model.{Application, Service}
 import io.hydrosphere.serving.manager.service.clouddriver.CloudService
-
-case class ApplicationChanged(application: Application)
-
-case class ApplicationRemoved(application: Application)
-
-case class ServiceChanged(service: Service)
-
-case class ServiceRemoved(service: Service)
-
-case class CloudServiceDetected(cloudServices: Seq[CloudService])
+import io.hydrosphere.serving.manager.service.envoy.xds.dto._
 
 class InternalManagerEventsPublisher(implicit actorSystem: ActorSystem) {
 

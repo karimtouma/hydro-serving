@@ -4,7 +4,7 @@ import envoy.api.v2.DiscoveryResponse
 import io.grpc.stub.StreamObserver
 import io.hydrosphere.serving.manager.grpc.applications.{Application, ExecutionGraph, ExecutionStage, KafkaStreaming}
 import io.hydrosphere.serving.manager.model.ApplicationStage
-import io.hydrosphere.serving.manager.service.{ApplicationChanged, ApplicationRemoved}
+import io.hydrosphere.serving.manager.service.envoy.xds.dto.{ApplicationChanged, ApplicationRemoved, SyncApplications}
 
 import scala.collection.mutable
 
