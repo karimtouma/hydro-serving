@@ -8,6 +8,7 @@ import cats.implicits._
 import com.spotify.docker.client.DockerClient
 import com.spotify.docker.client.DockerClient.BuildParam
 import com.spotify.docker.client.exceptions.DockerException
+import io.hydrosphere.serving.manager.model.Result.ClientError
 import io.hydrosphere.serving.manager.model.{HFResult, Result}
 import io.hydrosphere.serving.manager.model.db.ModelBuild
 import org.apache.commons.io.FileUtils

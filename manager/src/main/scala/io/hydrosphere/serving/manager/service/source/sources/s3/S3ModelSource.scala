@@ -42,7 +42,7 @@ class S3ModelSource(val sourceDef: S3SourceDef) extends ModelSource with Logging
     modelKeys
       .map(URI.create)
       .map(_.toString)
-      .map(getReadableFile)
+      .map(downloadObject)
 
     val r = localSource.getAllFiles(folder)
     logger.debug(s"getAllFiles=$r")
@@ -59,7 +59,6 @@ class S3ModelSource(val sourceDef: S3SourceDef) extends ModelSource with Logging
 
   override def getAbsolutePath(path: String): Path = {
     logger.debug(s"getAbsolutePath: $path")
-    getAllFiles(path)
     localSource.getAbsolutePath(path)
   }
 
@@ -94,10 +93,9 @@ class S3ModelSource(val sourceDef: S3SourceDef) extends ModelSource with Logging
     if (Files.isRegularFile(folderStructure)) { // FIX sometimes s3 puts the entire folder
       Files.delete(folderStructure)
     }
-
     Files.createDirectories(folderStructure)
 
-    val file = Files.createFile(localSource.getAbsolutePath(objectPath))
+    val file = localSource.getAbsolutePath(objectPath)
     Files.copy(fileStream, file, StandardCopyOption.REPLACE_EXISTING)
     file.toFile
   }

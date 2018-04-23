@@ -129,7 +129,7 @@ class LocalCloudDriverService(
       .env(envMap.map { case (k, v) => s"$k=$v" }.toList)
       .build(), s"s${service.id}app${service.serviceName}")
     dockerClient.startContainer(c.id())
-
+    Thread.sleep(1000)
     val cloudService = fetchById(service.id)
     internalManagerEventsPublisher.cloudServiceDetected(Seq(cloudService))
     cloudService

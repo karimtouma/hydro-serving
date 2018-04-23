@@ -4,7 +4,7 @@ import java.nio.file.{Files, Path, Paths}
 import java.time.LocalDateTime
 
 import io.hydrosphere.serving.contract.model_contract.ModelContract
-import io.hydrosphere.serving.contract.utils.description.ContractDescription
+import io.hydrosphere.serving.contract.utils.description.{ContractDescription, FieldDescription, SignatureDescription}
 import io.hydrosphere.serving.contract.utils.ops.ModelContractOps._
 import io.hydrosphere.serving.manager.controller.model.UploadedEntity
 import io.hydrosphere.serving.manager.model.Result.ClientError
@@ -18,6 +18,9 @@ import io.hydrosphere.serving.manager.service.source.sources.ModelSource
 import io.hydrosphere.serving.manager.service.source.SourceManagementService
 import io.hydrosphere.serving.manager.util.TarGzUtils
 import Result.Implicits._
+import cats.data.EitherT
+import cats.implicits._
+import io.hydrosphere.serving.tensorflow.types.DataType
 import org.apache.logging.log4j.scala.Logging
 import spray.json.JsObject
 
@@ -55,7 +58,18 @@ class ModelManagementServiceImpl(
             val newModel = entity.toModel(foundModel)
             modelRepository
               .update(newModel)
-              .map(_ => Right(newModel))
+              .flatMap { _ =>
+                val args = newModel.source.split(':')
+                val f = for {
+                  sourceName <- EitherT(Future.successful(args.headOption.toHResult(ClientError(s"Invalid source: ${newModel.source}"))))
+                  modelPath <- EitherT(Future.successful(args.lastOption.toHResult(ClientError(s"Invalid source: ${newModel.source}"))))
+                  source <- EitherT(sourceManagementService.getSource(sourceName))
+                } yield {
+                  source.getAllFiles(modelPath)
+                  newModel
+                }
+                f.value
+              }
           case None => Result.clientErrorF(s"Can't find Model with id ${entity.id.get}")
         }
       case None => Result.clientErrorF("Id is required for this action")
@@ -132,9 +146,15 @@ class ModelManagementServiceImpl(
   }
 
   override def modelContractDescription(modelId: Long): HFResult[ContractDescription] = {
-    getMap(getModel(modelId)) { model =>
-      model.modelContract.flatten
+    val f = for {
+      model <- EitherT(getModel(modelId))
+    } yield {
+      println(model)
+      val res = model.modelContract.flatten
+      println(res)
+      res
     }
+    f.value
   }
 
   def writeFilesToSource(source: ModelSource, files: Map[Path, Path]): Unit = {
